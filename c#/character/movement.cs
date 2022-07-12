@@ -180,8 +180,16 @@ public class movement : MonoBehaviour
     void alreadydead()
     {
         dead = true;
+        Physics2D.IgnoreLayerCollision(8, 11, true);
+        if (!can_jump)
+        {
+            cancel.Cancel();
+            cancel.Dispose();
+        }
+
         if(deadA)
             an.Play(deadAnim);
+
     }//play dead animation when takedamage.cs hp<=0
 
     void checkPause()

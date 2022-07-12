@@ -29,7 +29,6 @@ public class ai : MonoBehaviour
     }
     [SerializeField] internal Transform tr;
     [SerializeField] Transform ptr,  texttr;
-    
     [SerializeField] Animator selfAnim;
     [SerializeField] Rigidbody2D rb;
     [SerializeField] CapsuleCollider2D pcc, kcc;
@@ -38,6 +37,8 @@ public class ai : MonoBehaviour
     [SerializeField] state st = new state();
     [SerializeField] string idleAnim, parryAnim, walkAnim, dieAnim;
     [SerializeField] List<attackType> attackData;
+    public bool stop, isblocking;
+
     [Serializable] struct attackType
     {
         public string AnimName;
@@ -46,10 +47,10 @@ public class ai : MonoBehaviour
     [SerializeField] GameObject dialogue;
     internal float aiAccuracy, xdtr;
     internal int direction = 0;
-    internal bool inrange, wallcrashed, isblocking = false;
+    internal bool inrange, wallcrashed;
     float dasht = -3, attackTime = -3, bt = -10, lastattacktime = 0, speed = 0, determineTime;
     int score = 0, RandomAtIndex = 0, attack_last_i = 4, midAtIndex = 0, walkforward = 0, walkis1 = 0, ranAtpercent=0;
-    bool is_dashing = false, invincible = false, dead = false, pause = false, can_attack = true, is_facing, _is_left = false, is_ground, alreadyDead = false, waitismock, mockFin, haveMock = false, stop=false;
+    bool is_dashing = false, invincible = false, dead = false, pause = false, can_attack = true, is_facing, _is_left = false, is_ground, alreadyDead = false, waitismock, mockFin, haveMock = false;
 
     bool is_left
     {
@@ -120,32 +121,37 @@ public class ai : MonoBehaviour
         mockFin = true;
         hit = new aiattInt(this);
         press = new aiattInt(this);
-       
+
     }
     void Update()
     {
         if (!dead)
         {
-            if (stop)
-                return;
-            if (!pause && !isblocking)
+            if (!pause)
             {
+                if (stop || isblocking)
+                {
+                    direction = 0;
+                    facing_dir();
+                    return;
+                }
                 facing_dir();
                 determine();
                 DOit?.Invoke();
-
             }
             else
             {
                 selfAnim.Play(idleAnim);
             }
         }
-
     }
 
     private void FixedUpdate()
     {
-        if (!is_dashing)
+        if (isblocking)
+            rb.velocity = new Vector2(0, -9.81f);  
+        if (is_dashing)
+            return;
             rb.velocity = new Vector2(walkforward * direction * Time.fixedDeltaTime * walkis1 * speed * 50, -9.81f);//walk 
     }
 
@@ -236,12 +242,12 @@ public class ai : MonoBehaviour
     {
         if (can_attack && !inrange)
         {
-            if (st == state.block)
+            /*if (st == state.block)
             {
                 bt = -10;
                 st = state.walk;
                 selfAnim.Play(idleAnim);
-            }
+            }*/
             if (can_attack && Mathf.Abs(xdtr) > 10 && Time.time - dasht > 3)
             {
                 dasht = Time.time;
@@ -258,7 +264,7 @@ public class ai : MonoBehaviour
         }
         else if (can_attack && inrange)
         {
-            if (Time.time - attackTime > 2)
+            if (Time.time - attackTime > 2.5)
             {
                 attackTime = Time.time;
                 ranAtpercent = UnityEngine.Random.Range(0, 100);
@@ -273,11 +279,6 @@ public class ai : MonoBehaviour
             else
                 kangoidle();
         }
-    }
-
-    async void aggressive1()
-    {
-        await Task.Delay(10);
     }
 
     void passive()
@@ -328,14 +329,12 @@ public class ai : MonoBehaviour
             if (Time.time - attackTime > 3 && is_facing)
             {
                 ranAtpercent = UnityEngine.Random.Range(0, 100);
+                attackTime = Time.time;
                 if (ranAtpercent < 50)
                 {
-
-                    /*can_attack = false;
-                    selfAnim.Play(parryAnim);
-                    attackTime = Time.time;*/
+                    StartCoroutine(dash(-1, 0, 10f));
                 }
-                else if(ranAtpercent<90)
+                else if (ranAtpercent < 90)
                     StartCoroutine(dash(-1, 1, 15f));
                 else
                     block(blockAct);
@@ -404,20 +403,23 @@ public class ai : MonoBehaviour
         is_facing = is_left ? (ptr.localScale.x > 0 ? true : false) : (ptr.localScale.x > 0 ? false : true);
         if (isblocking)
             if ((xdtr < 0 && tr.localScale.x < 0) || (xdtr > 0 && tr.localScale.x > 0))
+            {
+                Debug.Log("sudden end");
+
                 suddenEndBlock();
-        
+            }
     }
     //}
     void checkPause()
     {
         pause = Time.timeScale == 0 ? true : false;
     }
+
     public void isground()
     {
         ra = Physics2D.CircleCast(new Vector2(tr.position.x, tr.position.y), 0.1f, Vector2.down * .1f, 1f, mask);
         is_ground = ra.collider != null;
     }
-
 
     //what can knight do{
     IEnumerator dash(int tow, int attack, float force, int atI=1, float dashT=0.2f) //tow mean to where, attack =0 is break, force 15 is cool, atI= atindex
@@ -451,6 +453,7 @@ public class ai : MonoBehaviour
             yield return new WaitForSeconds(0.5f);
             walkis1 = 1;
             dasht = Time.time;
+            attackTime = Time.time;
             StartCoroutine(dash(1, -1, force,2, dashT:0.1f));
             yield return new WaitForSeconds(0.3f);
             stop = false;
@@ -566,6 +569,7 @@ public class ai : MonoBehaviour
         {
             selfAnim.speed = 1;
             selfAnim.Play("unblock");
+            isblocking = false;
         }
     }
 
