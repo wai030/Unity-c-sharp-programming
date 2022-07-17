@@ -29,28 +29,26 @@ public class ai : MonoBehaviour
     }
     [SerializeField] internal Transform tr;
     [SerializeField] Transform ptr,  texttr;
-    [SerializeField] Animator selfAnim;
+    [SerializeField] CapsuleCollider2D kcc, pcc;
     [SerializeField] Rigidbody2D rb;
-    [SerializeField] CapsuleCollider2D pcc, kcc;
+    [SerializeField] Animator selfAnim;
     [SerializeField] take_damage ad_takeD, kn_takeD;
     [SerializeField] score Score;
-    [SerializeField] state st = new state();
+    [SerializeField] SpriteRenderer SR;
     [SerializeField] string idleAnim, parryAnim, walkAnim, dieAnim;
     [SerializeField] List<attackType> attackData;
-    public bool stop, isblocking;
-
     [Serializable] struct attackType
     {
         public string AnimName;
         public int dmg;
     }
-    [SerializeField] GameObject dialogue;
-    internal float aiAccuracy, xdtr;
+    [SerializeField] GameObject dialogue, self; 
+    internal float aiAccuracy, xdtr,ok;
     internal int direction = 0;
-    internal bool inrange, wallcrashed;
-    float dasht = -3, attackTime = -3, bt = -10, lastattacktime = 0, speed = 0, determineTime;
+    internal bool inrange, wallcrashed, isblocking;
+    float dasht = -3, attackTime = -3, speed = 0, determineTime;
     int score = 0, RandomAtIndex = 0, attack_last_i = 4, midAtIndex = 0, walkforward = 0, walkis1 = 0, ranAtpercent=0;
-    bool is_dashing = false, invincible = false, dead = false, pause = false, can_attack = true, is_facing, _is_left = false, is_ground, alreadyDead = false, waitismock, mockFin, haveMock = false;
+    bool is_dashing = false, dead = false, pause = false, can_attack = true, is_facing, _is_left = false, is_ground, alreadyDead = false, waitismock, mockFin, haveMock = false, stop;
 
     bool is_left
     {
@@ -68,7 +66,7 @@ public class ai : MonoBehaviour
         }
     }
     enum mind { aggressive, passive, counter, mock }
-    [SerializeField]mind mand = new mind();
+    mind mand = new mind();
     mind md
     {
         get { return mand; }
@@ -80,17 +78,6 @@ public class ai : MonoBehaviour
             chooseState(value);
             DOit += isground;
         }
-    }
-    enum state
-    {
-        attack,
-        walk,
-        deflect,
-        block,
-        roll,
-        idle,
-        dead,
-        dash
     }
     CancellationTokenSource cancel, mockaction, blockAct;
     showcanvas show;
@@ -115,13 +102,11 @@ public class ai : MonoBehaviour
 
     void Start()
     {
-        st = state.idle;
         DOit = aggressive;
         DOit += isground;
         mockFin = true;
         hit = new aiattInt(this);
         press = new aiattInt(this);
-
     }
     void Update()
     {
@@ -131,7 +116,7 @@ public class ai : MonoBehaviour
             {
                 if (stop || isblocking)
                 {
-                    direction = 0;
+                    rb.velocity = new Vector2(0, 0);
                     facing_dir();
                     return;
                 }
@@ -160,7 +145,7 @@ public class ai : MonoBehaviour
     {
         if (!can_attack || isblocking)
             return;
-        if (!mockFin && Mathf.Abs(xdtr) < 7)//if mock not yet finish and player come close 
+        if (!mockFin && Mathf.Abs(xdtr) < 5)//if mock not yet finish and player come close 
         {
             cancelAndCreate(ref mockaction);//mockaction will cancel the mocking in mock timer
         }
@@ -208,7 +193,7 @@ public class ai : MonoBehaviour
             await Task.Delay(20000, token);
             while (waitismock)
             {
-                if (Mathf.Abs(xdtr) > 7)
+                if (Mathf.Abs(xdtr) > 5)
                 {
                     md = mind.mock;
                     mockFin = false;//set this in determine can focus on mocking on them when not in other state
@@ -228,7 +213,7 @@ public class ai : MonoBehaviour
             dialogue.SetActive(false);
             waitismock = false;
         }
-        catch (System.OperationCanceledException) when (mockaction.IsCancellationRequested)//cancel if closer than 7 unit
+        catch (System.OperationCanceledException) when (mockaction.IsCancellationRequested)//cancel if closer than 5 unit
         {
             dialogue.SetActive(false);
             waitismock = false;
@@ -242,12 +227,6 @@ public class ai : MonoBehaviour
     {
         if (can_attack && !inrange)
         {
-            /*if (st == state.block)
-            {
-                bt = -10;
-                st = state.walk;
-                selfAnim.Play(idleAnim);
-            }*/
             if (can_attack && Mathf.Abs(xdtr) > 10 && Time.time - dasht > 3)
             {
                 dasht = Time.time;
@@ -290,11 +269,12 @@ public class ai : MonoBehaviour
                 tr.localScale = new Vector3(tr.localScale.x * -1 * 5, 1 * 5, 1);
                 texttr.localScale = new Vector3(tr.localScale.x/5 * -1, 1, 1);
                 md = mind.counter;
+                haveMock = false;
             }
             if (can_attack && Mathf.Abs(xdtr) >= 13)
             {
                 kangoidle();
-                Debug.Log("heal");
+                heal();
             }
             else if (can_attack && Mathf.Abs(xdtr) < 4 && Time.time - dasht > 3)
             {
@@ -330,14 +310,19 @@ public class ai : MonoBehaviour
             {
                 ranAtpercent = UnityEngine.Random.Range(0, 100);
                 attackTime = Time.time;
-                if (ranAtpercent < 50)
+                if (ranAtpercent < 30)
                 {
                     StartCoroutine(dash(-1, 0, 10f));
                 }
+                else if (ranAtpercent < 60)
+                    StartCoroutine(dash(-1, 1, 15f, useForce:false));
                 else if (ranAtpercent < 90)
                     StartCoroutine(dash(-1, 1, 15f));
                 else
+                {
                     block(blockAct);
+                }
+                    
             }
 
             else
@@ -353,7 +338,6 @@ public class ai : MonoBehaviour
         {
             selfAnim.SetFloat("speed", 1 * playback);
             selfAnim.Play(walkAnim);
-            st = state.walk;
             this.walkforward=walkforward;
             this.speed = speed;
             walkis1 = 1;
@@ -404,8 +388,6 @@ public class ai : MonoBehaviour
         if (isblocking)
             if ((xdtr < 0 && tr.localScale.x < 0) || (xdtr > 0 && tr.localScale.x > 0))
             {
-                Debug.Log("sudden end");
-
                 suddenEndBlock();
             }
     }
@@ -422,9 +404,8 @@ public class ai : MonoBehaviour
     }
 
     //what can knight do{
-    IEnumerator dash(int tow, int attack, float force, int atI=1, float dashT=0.2f) //tow mean to where, attack =0 is break, force 15 is cool, atI= atindex
+    IEnumerator dash(int tow, int attack, float force, int atI = 1, float dashT = 0.2f, bool useForce = true) //tow mean to where, attack =0 is break, force 15 is cool, atI= atindex
     {
-        st = state.dash;
         can_attack = false;
         is_dashing = true;
         Physics2D.IgnoreLayerCollision(7, 11, true);
@@ -433,8 +414,8 @@ public class ai : MonoBehaviour
         float gravity = rb.gravityScale;
         rb.gravityScale = 0;
         yield return new WaitForSeconds(dashT);
-        rb.gravityScale = gravity;
         rb.velocity = new Vector2(0f, 0f);
+        rb.gravityScale = gravity;
         can_attack = true;
         is_dashing = false;
         Physics2D.IgnoreLayerCollision(7, 11, false);
@@ -445,7 +426,7 @@ public class ai : MonoBehaviour
             yield break;
         }
 
-        if(attack == 1)//dash at
+        if(attack == 1)//dash back and forward
         {
             stop = true;
             selfAnim.Play("idle");
@@ -454,9 +435,13 @@ public class ai : MonoBehaviour
             walkis1 = 1;
             dasht = Time.time;
             attackTime = Time.time;
-            StartCoroutine(dash(1, -1, force,2, dashT:0.1f));
-            yield return new WaitForSeconds(0.3f);
             stop = false;
+            if(useForce)
+                StartCoroutine(dash(1, -1, force,2, dashT:0.1f));
+            else
+                StartCoroutine(dash(1, -1, force*2, 2, dashT: 0.1f));
+            yield return new WaitForSeconds(0.3f);
+            
             
         }
         else if (attack == -1)//back at
@@ -471,13 +456,11 @@ public class ai : MonoBehaviour
     {
         selfAnim.Play("roll");
         Physics2D.IgnoreCollision(pcc, kcc, true);
-        st = state.roll;
         can_attack = false;
         if (is_left)
             tr.localScale = new Vector3(-1, 1, 1);
         else
             tr.localScale = new Vector3(1, 1, 1);
-        st = state.roll;
         rb.velocity = new Vector2(rb.velocity.x, 0f);
         rb.AddForce(new Vector2(130000f * direction, 0f), ForceMode2D.Impulse);
         float gravity = rb.gravityScale;
@@ -524,7 +507,6 @@ public class ai : MonoBehaviour
         selfAnim.Play(attackData[RandomAtIndex].AnimName);
         addAndminus(press, 1, 10);
         can_attack = false;
-        st = state.attack;
         attackTime = Time.time;
         walkis1 = 0;
     }
@@ -578,6 +560,17 @@ public class ai : MonoBehaviour
         cancelAndCreate(ref blockAct);
     }
 
+    async void heal()
+    {
+        stop = true;
+        SR.color = new Color(0.92f, 1, 0);
+        await Task.Delay(2000);
+        kn_takeD.takedamage(-500, false);
+        stop = false;
+        SR.color = new Color(1, 1, 1);
+
+    }
+
     //}what can knight do
     //
     //anim-function{
@@ -586,17 +579,6 @@ public class ai : MonoBehaviour
         Physics2D.IgnoreCollision(pcc, kcc, true);
         alreadyDead = true;
     }
-
-    public void vincible()
-    {
-        invincible = true;
-    }
-
-    public void vinciblenot()
-    {
-        invincible = false;
-    }
-
     public void blockIgnore()
     {
         selfAnim.speed = 0;/*
@@ -617,7 +599,6 @@ public class ai : MonoBehaviour
     public void kangoidle()
     {
         selfAnim.Play(idleAnim);
-        st = state.idle;
         can_attack = true;
         walkis1 = 0;
     }
@@ -626,7 +607,6 @@ public class ai : MonoBehaviour
     {
         dead = true;
         selfAnim.Play(dieAnim);
-        st = state.dead;
         kn_takeD.enabled = false;
         StartCoroutine(extendDeath());
     }
@@ -642,10 +622,7 @@ public class ai : MonoBehaviour
         yield return new WaitForSeconds(3f);
         if (dead && alreadyDead && is_ground)
         {
-            foreach (Transform child in tr.transform.GetChild(0))
-                Destroy(child.gameObject);
-            Destroy(kn_takeD);
-            Destroy(this);
+            Destroy(self);
         }
     }// wrap things up after knight dead
 

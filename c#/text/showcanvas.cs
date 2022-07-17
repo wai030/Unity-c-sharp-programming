@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using UnityEngine.UI;
 using System;
 
-
 [RequireComponent(typeof(create_text_array))]
 
 public class showcanvas : MonoBehaviour
@@ -18,11 +17,13 @@ public class showcanvas : MonoBehaviour
     */
     [SerializeField] List<GameObject> optionPanel;
     [SerializeField] ai AI;
+    [SerializeField] GameObject health;
     public event Action sendpause;
     public static int i = 0;// i is the line location
     public int txtspeed;
     GameObject Panel;
     Text t;
+    [SerializeField] TextMesh TePro;
     create_text_array ta;
     CancellationTokenSource cancel;
     string txtn= "start", z;
@@ -53,6 +54,7 @@ public class showcanvas : MonoBehaviour
         Panel=GameObject.FindGameObjectWithTag("Panel");
         if (ta == null||t == null|| Panel==null)
             gameObject.SetActive(false);
+        i = 0;
     }
 
     private void Start()
@@ -105,6 +107,7 @@ public class showcanvas : MonoBehaviour
                     pause = false;
                     t.text = "";
                     AI?.hitalert();
+                    health.SetActive(true);
                     break;
                 default:
                     foreach (var k in ta.gettext(txtn, i))

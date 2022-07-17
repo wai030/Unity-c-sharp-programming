@@ -1,8 +1,6 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-using System;
 public class create_text_array : MonoBehaviour
 {
 

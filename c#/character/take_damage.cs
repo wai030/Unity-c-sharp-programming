@@ -1,13 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEditor;
 using System;
 public class take_damage : MonoBehaviour
 {
     //require deadfunction implemented
-    [SerializeField] GameObject self;
-    [SerializeField] string dead_func;
+    [SerializeField] GameObject self, endG;
+    [SerializeField] Text text;
+    [SerializeField] string dead_func, Endword;
     [SerializeField] SpriteRenderer sr;
     [SerializeField] Material  white;
     [SerializeField] float whiteT;
@@ -17,19 +19,30 @@ public class take_damage : MonoBehaviour
     [HideInInspector] [SerializeField] internal bool aiNeeded;
     [HideInInspector] [SerializeField] internal string determine_func;
     [HideInInspector] [SerializeField] internal GameObject enemyai;
+    [SerializeField] healthBar Health;
+    
     void Start()
     {
         original = sr.material;
         currentH = maxH;
+        Health?.setbar(currentH / maxH);
     }
 
-    public void takedamage(int damage)
+    public void takedamage(int damage, bool turnwhite=true)
     {
         currentH -= damage;
         if (currentH <= 0)
+        {
             die();
-        StartCoroutine(turn_white(whiteT, 4));
+            endG.SetActive(true);
+            text.text = Endword;
+        }
+        if(turnwhite)
+            StartCoroutine(turn_white(whiteT, 4));
+
         enemyai?.GetComponent<ai>()?.hitalert();
+        Health?.setbar((float)currentH / maxH);
+
     }
     IEnumerator turn_white(float t, int blink)
     {
@@ -60,6 +73,9 @@ public class take_damage : MonoBehaviour
     }
 
 }
+
+
+#if UNITY_EDITOR
 [CustomEditor(typeof(take_damage))]
 [CanEditMultipleObjects]// custom editor
 public class take_damageEditor : Editor
@@ -81,4 +97,4 @@ public class take_damageEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 }
-
+#endif
